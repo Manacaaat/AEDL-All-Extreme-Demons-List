@@ -277,6 +277,10 @@
 			{ id: 'sary-never-clear-original', name: 'Sary Never Clear Original', rank: 5, creator: 'Unknown', verifier: 'Unknown', victors: [], difficulty: 'Insane', tier: 'Fuck', length: 'Unknown', fps: 'Unknown', color: 'lime', desc: 'New level added to the index.', source: 'NEW' },
 			{ id: 'lesopowal', name: 'Lesopowal', rank: 9, creator: 'Unknown', verifier: 'Unknown', victors: [], difficulty: 'Insane', tier: 'Fuck', length: 'Unknown', fps: 'Unknown', color: 'cyan', desc: 'New level added to the index.', source: 'NEW' }
 		];
+		const localLevels = [
+			// Add a level here. Use rank to place it; omit rank to append it to the list.
+			// { id: 'my-level-id', name: 'My Level', rank: 25, creator: 'Creator', verifier: 'Verifier', tier: 'Extreme', length: 'Long', color: 'pink', desc: 'Description', video: 'https://youtu.be/...' }
+		];
 		const localSubmissions = [
 			// Add a record by filling in: type, level, user, percent, and video_url.
 			// Add a new level by changing type to 'level' and filling in its level fields.
@@ -305,24 +309,32 @@
 		const submitPanel = document.querySelector('.submit-panel');
 
 		function normalizeName(name = '') { return String(name).toLowerCase().replace(/[^a-z0-9]/g, ''); }
-		function pointsForTier(tier = '', rank) { const tiers = ['Fuck', 'Beginner', 'Easy', 'Medium', 'Hard', 'Very Hard', 'Insane', 'Extreme', 'Remorseless', 'Relentless', 'Terrifying', 'Catastrophic', 'Inexorable', 'Excruciating', 'Merciless']; const tierIndex = tiers.findIndex(name => name.toLowerCase() === String(tier).toLowerCase()); const tierPoints = 100 + Math.max(0, tierIndex) * 50; const numericRank = Number(rank); return tierPoints + (numericRank > 0 && numericRank <= 50 ? 25 : 0) + (numericRank > 0 && numericRank <= 10 ? 50 : 0); }
+		function tierIndex(tier = '') { const tiers = ['Fuck', 'Beginner', 'Easy', 'Medium', 'Hard', 'Very Hard', 'Insane', 'Extreme', 'Remorseless', 'Relentless', 'Terrifying', 'Catastrophic', 'Inexorable', 'Excruciating', 'Merciless']; return Math.max(0, tiers.findIndex(name => name.toLowerCase() === String(tier).toLowerCase())); }
+		function pointsForLevel(level, position, total) { return Math.max(1, total - position); }
+		function recalculatePoints() { const rankedTotal = levels.filter(level => Number(level.rank) > 0).length; levels.forEach(level => { level.points = Number(level.rank) > 0 ? pointsForLevel(level, Number(level.rank) - 1, rankedTotal) : 0; }); }
 		document.getElementById('discord-link').href = SOCIAL_LINKS.discord;
 		document.getElementById('tiktok-link').href = SOCIAL_LINKS.tiktok;
 		document.getElementById('youtube-link').href = SOCIAL_LINKS.youtube;
 		function cleanContent(value = '') { return String(value).replace(/\bepilepsy\b/gi, '').replace(/\bdo not\b/gi, '').replace(/\bdon['’]?t\b/gi, '').replace(/\bdont\b/gi, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,!?])/g, '$1').trim(); }
-		function tagNames(level) { return (level.tags || []).map(tag => cleanContent(typeof tag === 'string' ? tag : tag.name || tag.label || '')).filter(tag => tag && !/\bbeat\b/i.test(tag)); }
+		function tagNames(level) { return sortTags((level.tags || []).map(tag => cleanContent(typeof tag === 'string' ? tag : tag.name || tag.label || '')).filter(tag => tag && !/\bbeat\b/i.test(tag))); }
+		function sortTags(tags = []) {
+			const unique = [...new Map(tags.map(tag => [String(tag).toLowerCase(), String(tag).trim()])).values()].filter(Boolean);
+			const priority = ['Overall', 'Fast-Paced', 'Timings', 'Chokepoints', 'Duals', 'Ship', 'Wave', 'Robot', 'Spider', 'Swing', 'Long', 'Medium', 'Short', 'XL'];
+			return unique.sort((first, second) => { const firstPriority = priority.findIndex(tag => tag.toLowerCase() === first.toLowerCase()); const secondPriority = priority.findIndex(tag => tag.toLowerCase() === second.toLowerCase()); if (firstPriority !== secondPriority) return (firstPriority < 0 ? priority.length : firstPriority) - (secondPriority < 0 ? priority.length : secondPriority); return first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' }); });
+		}
 		function populateFilterOptions() {
-			const tiers = [...new Set(levels.map(level => level.tier).filter(Boolean))].sort();
-			const tags = [...new Set(levels.flatMap(tagNames))].sort((first, second) => String(first).localeCompare(String(second)));
+			const tierOrder = ['Fuck', 'Beginner', 'Easy', 'Medium', 'Hard', 'Very Hard', 'Insane', 'Extreme', 'Remorseless', 'Relentless', 'Terrifying', 'Catastrophic', 'Inexorable', 'Excruciating', 'Merciless'];
+			const tiers = [...new Set(levels.map(level => level.tier).filter(Boolean))].sort((first, second) => { const firstIndex = tierOrder.findIndex(tier => tier.toLowerCase() === String(first).toLowerCase()); const secondIndex = tierOrder.findIndex(tier => tier.toLowerCase() === String(second).toLowerCase()); return (firstIndex < 0 ? tierOrder.length : firstIndex) - (secondIndex < 0 ? tierOrder.length : secondIndex) || String(first).localeCompare(String(second)); });
+			const tags = sortTags(levels.flatMap(tagNames));
 			document.getElementById('tier-filter').innerHTML = '<option value="All">All NLW tiers</option>' + tiers.map(tier => `<option value="${escapeHtml(tier)}">${escapeHtml(tier)}</option>`).join('');
 			document.getElementById('tag-filter').innerHTML = '<option value="All">All tags</option>' + tags.map(tag => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('');
 		}
 		function renderLeaderboard() {
 			const players = new Map();
-			levels.filter(level => level.source === 'AREDL').forEach(level => (level.records || []).filter(record => Number(record.percent) === 100).forEach(record => {
+			levels.forEach(level => (level.records || []).filter(record => Number(record.percent) === 100).forEach(record => {
 				const name = record.user || record.submitted_by?.global_name || record.submitted_by?.username || 'Unknown player';
 				const current = players.get(name) || { name, points: 0, levels: 0 };
-				current.points += level.points || pointsForTier(level.tier, level.rank);
+				current.points += level.points || 0;
 				current.levels++;
 				players.set(name, current);
 			}));
@@ -342,10 +354,11 @@
 		function escapeHtml(value = '') { return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character])); }
 		function colorFor(name = '') { return ['pink', 'orange', 'cyan', 'violet', 'lime'][name.length % 5]; }
 		function thumbnailFor(level) { if (level.source === 'AREDL') return `https://raw.githubusercontent.com/All-Rated-Extreme-Demon-List/Thumbnails/main/levels/cards/${level.id}.webp`; const videoId = level.video?.match(/(?:watch\?v=|youtu\.be\/|shorts\/)([\w-]+)/)?.[1]; return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : ''; }
-		function normalizeAredl(level) { const nlw = window.nlwData?.[normalizeName(level.name)]; const tier = nlw?.tier || level.nlw_tier || level.tier || level.tier_name || 'Uncategorized'; return { ...level, id: level.level_id, source: 'AREDL', rank: level.position, creator: 'AREDL community', verifier: 'Open details', difficulty: 'Extreme', tier, points: pointsForTier(tier, level.position), length: level.tags?.find(tag => /short|medium|long|xl/i.test(tag)) || 'Unknown', fps: 'Live data', color: colorFor(level.name), desc: cleanContent(nlw?.description || level.description || 'No description supplied.') }; }
-		function normalizeUdl(level, path, rank) { const nlw = window.nlwData?.[normalizeName(level.name)]; const tier = nlw?.tier || level.nlw_tier || nlwTierOverrides[normalizeName(level.name)] || level.tier || level.tier_name || 'Uncategorized'; const levelRank = path.startsWith('_') ? null : rank; return { ...level, id: level.id, source: 'UDL', rank: levelRank, creator: level.author || 'Unknown', verifier: level.verifier || 'Unknown', video: level.verification, victors: [], records: [], difficulty: 'Extreme', tier, points: pointsForTier(tier, levelRank), length: level.tags?.find(tag => /short|medium|long|xl/i.test(tag)) || 'Unknown', fps: 'Live data', color: colorFor(level.name), desc: cleanContent(nlw?.description || level.description || 'No description supplied.'), path }; }
+		function normalizeAredl(level) { const nlw = window.nlwData?.[normalizeName(level.name)]; const tier = nlw?.tier || level.nlw_tier || level.tier || level.tier_name || 'Uncategorized'; return { ...level, id: level.level_id, source: 'AREDL', rank: level.position, creator: 'AREDL community', verifier: 'Open details', difficulty: 'Extreme', tier, points: 0, length: level.tags?.find(tag => /short|medium|long|xl/i.test(tag)) || 'Unknown', fps: 'Live data', color: colorFor(level.name), desc: cleanContent(nlw?.description || level.description || 'No description supplied.') }; }
+		function normalizeUdl(level, path, rank) { const nlw = window.nlwData?.[normalizeName(level.name)]; const tier = nlw?.tier || level.nlw_tier || nlwTierOverrides[normalizeName(level.name)] || level.tier || level.tier_name || 'Uncategorized'; return { ...level, id: level.id, source: 'UDL', rank: null, creator: level.author || 'Unknown', verifier: level.verifier || 'Unknown', video: level.verification, tags: [], victors: [], records: [], difficulty: 'Extreme', tier, points: 0, length: 'Unknown', fps: 'Live data', color: colorFor(level.name), desc: cleanContent(nlw?.description || level.description || 'No description supplied.'), path }; }
+		function addLocalLevels(list) { localLevels.filter(level => level.name && level.id).forEach(level => { const localLevel = { ...level, source: 'LOCAL', rank: null, difficulty: level.difficulty || 'Extreme', tier: level.tier || 'Uncategorized', points: 0, creator: level.creator || 'Unknown', verifier: level.verifier || 'Unknown', length: level.length || 'Unknown', color: level.color || colorFor(level.name), desc: level.desc || 'Locally submitted level.' }; const requestedRank = Number(level.rank); const insertionIndex = requestedRank > 0 ? Math.min(requestedRank - 1, list.length) : list.length; list.splice(insertionIndex, 0, localLevel); }); }
 		function applyLocalSubmissions() {
-			localSubmissions.filter(submission => submission.type === 'level' && submission.name && submission.id).forEach(submission => levels.push({ ...submission, source: 'LOCAL', rank: null, difficulty: submission.difficulty || 'Extreme', tier: submission.tier || 'Uncategorized', points: pointsForTier(submission.tier, null), creator: submission.creator || 'Unknown', verifier: submission.verifier || 'Unknown', length: submission.length || 'Unknown', color: submission.color || colorFor(submission.name), desc: submission.desc || 'Locally submitted level.' }));
+			localSubmissions.filter(submission => submission.type === 'level' && submission.name && submission.id).forEach(submission => levels.push({ ...submission, source: 'LOCAL', rank: null, difficulty: submission.difficulty || 'Extreme', tier: submission.tier || 'Uncategorized', points: 0, creator: submission.creator || 'Unknown', verifier: submission.verifier || 'Unknown', length: submission.length || 'Unknown', color: submission.color || colorFor(submission.name), desc: submission.desc || 'Locally submitted level.' }));
 			localSubmissions.filter(submission => submission.type === 'record' && submission.level && submission.user).forEach(submission => {
 				const level = levels.find(candidate => normalizeName(candidate.name) === normalizeName(submission.level));
 				if (!level) return;
@@ -377,8 +390,10 @@
 				const rankedLevels = [...aredl];
 				rankedLevels.splice(4, 0, newLevels[0]);
 				rankedLevels.splice(8, 0, newLevels[1]);
+				addLocalLevels(rankedLevels);
 				rankedLevels.forEach((level, index) => { level.rank = index + 1; });
 				levels = rankedLevels;
+				recalculatePoints();
 				populateFilterOptions();
 				renderLeaderboard();
 				document.getElementById('level-count').textContent = levels.length.toLocaleString();
@@ -388,6 +403,7 @@
 				const udl = udlResults.filter(result => result.status === 'fulfilled').map(result => result.value);
 				levels = [...levels, ...udl];
 				applyLocalSubmissions();
+				recalculatePoints();
 				populateFilterOptions();
 				renderLeaderboard();
 				document.getElementById('level-count').textContent = levels.length.toLocaleString();
@@ -402,7 +418,7 @@
 			const rankQuery = term.match(/^(?:#|rank\s*)?(\d+)$/)?.[1];
 			const filtered = levels.filter(level => (currentFilter === 'All' || currentFilter === level.source || currentFilter === level.difficulty) && (currentTier === 'All' || level.tier === currentTier) && (currentTag === 'All' || tagNames(level).includes(currentTag)) && (rankQuery ? String(level.rank) === rankQuery : `${level.name} ${level.creator} ${level.source}`.toLowerCase().includes(term)));
 			const visible = filtered.slice(0, pageSize);
-			grid.innerHTML = visible.length ? visible.map((level, index) => `<article class="level-card ${escapeHtml(level.color)}" style="animation-delay:${index * 12}ms"><button class="open-level" data-id="${escapeHtml(level.source + '-' + level.id)}" style="display:block;width:100%;padding:0;border:0;color:inherit;background:none;text-align:left"><div class="thumb ${level.color}" style="background-image:linear-gradient(135deg,rgba(9,11,20,.2),rgba(9,11,20,.35)),url('${thumbnailFor(level)}')"><span class="rank">${level.rank ? '#' + String(level.rank).padStart(3, '0') : 'UDL'}</span><span class="difficulty">${level.source}</span><strong class="thumb-title">${escapeHtml(level.name)}</strong></div><div class="card-body"><h2 class="card-title">${escapeHtml(level.name)}</h2><div class="meta"><span>by <strong>${escapeHtml(level.creator)}</strong></span><span>${escapeHtml(level.tier)} · ${escapeHtml(level.length)}</span></div><div class="tag-list">${tagNames(level).map(tag => `<span class="level-tag">${escapeHtml(tag)}</span>`).join('')}</div><div class="card-footer"><span class="verifier"><i class="avatar">${initials(level.verifier)}</i> ${escapeHtml(level.verifier)}</span><span class="open">${escapeHtml(level.points || pointsForTier(level.tier, level.rank))} pts · Details +</span></div></div></button></article>`).join('') : '<div class="empty">No levels found in this part of the void.</div>';
+			grid.innerHTML = visible.length ? visible.map((level, index) => `<article class="level-card ${escapeHtml(level.color)}" style="animation-delay:${index * 12}ms"><button class="open-level" data-id="${escapeHtml(level.source + '-' + level.id)}" style="display:block;width:100%;padding:0;border:0;color:inherit;background:none;text-align:left"><div class="thumb ${level.color}" style="background-image:linear-gradient(135deg,rgba(9,11,20,.2),rgba(9,11,20,.35)),url('${thumbnailFor(level)}')"><span class="rank">${level.rank ? '#' + String(level.rank).padStart(3, '0') : 'UDL'}</span><span class="difficulty">${level.source}</span><strong class="thumb-title">${escapeHtml(level.name)}</strong></div><div class="card-body"><h2 class="card-title">${escapeHtml(level.name)}</h2><div class="meta"><span>by <strong>${escapeHtml(level.creator)}</strong></span><span>${escapeHtml(level.tier)} · ${escapeHtml(level.length)}</span></div><div class="tag-list">${tagNames(level).map(tag => `<span class="level-tag">${escapeHtml(tag)}</span>`).join('')}</div><div class="card-footer"><span class="verifier"><i class="avatar">${initials(level.verifier)}</i> ${escapeHtml(level.verifier)}</span><span class="open">${escapeHtml(level.points)} pts · Details +</span></div></div></button></article>`).join('') : '<div class="empty">No levels found in this part of the void.</div>';
 			loadMore.hidden = filtered.length <= pageSize;
 			document.querySelectorAll('.open-level').forEach(button => button.addEventListener('click', () => openModal(levels.find(level => level.source + '-' + level.id === button.dataset.id))));
 		}
@@ -411,14 +427,14 @@
 			document.getElementById('modal-top').innerHTML = `<div class="thumb ${level.color}" style="background-image:linear-gradient(135deg,rgba(9,11,20,.2),rgba(9,11,20,.35)),url('${thumbnailFor(level)}')"><span class="rank">${level.rank ? '#' + String(level.rank).padStart(3, '0') : 'UDL'}</span><span class="difficulty">${level.source}</span><strong class="thumb-title">${escapeHtml(level.name)}</strong></div><div class="modal-intro"><div class="eyebrow">${level.source} ${level.rank ? '/ placement #' + level.rank : '/ unrated archive'}</div><h2>${escapeHtml(level.name)}</h2><p>${escapeHtml(level.desc)}</p><a class="video" href="${level.video || '#'}" target="_blank" rel="noopener">▶ Watch verified video</a></div>`;
 			document.getElementById('modal-bottom').innerHTML = '<div class="empty">Loading verifier records...</div>';
 			let detail = level;
-			if (level.source === 'AREDL') { try { const detailResponse = await fetch(`${AREDL_API}/levels/${level.id}`); const localRecords = localSubmissions.filter(submission => submission.type === 'record' && normalizeName(submission.level) === normalizeName(level.name)).map(submission => ({ user: submission.user, percent: submission.percent, video_url: submission.video_url, verifier: submission.verifier })); detail = { ...level, ...(await detailResponse.json()), tier: level.tier, records: localRecords }; } catch (error) { detail = { ...level, description: 'Level details failed to load. Showing the summary available from the live list.' }; } }
+			if (level.source === 'AREDL') { try { const detailResponse = await fetch(`${AREDL_API}/levels/${level.id}`); const localRecords = localSubmissions.filter(submission => submission.type === 'record' && normalizeName(submission.level) === normalizeName(level.name)).map(submission => ({ user: submission.user, percent: submission.percent, video_url: submission.video_url, verifier: submission.verifier })); detail = { ...level, ...(await detailResponse.json()), tier: level.tier, points: level.points, records: localRecords }; } catch (error) { detail = { ...level, description: 'Level details failed to load. Showing the summary available from the live list.' }; } }
 			const verification = detail.verifications?.[0];
 			const verifier = verification?.submitted_by?.global_name || detail.verifier || 'Unknown';
 			const video = verification?.video_url || detail.video || '#';
 			const records = detail.records || [];
 			document.querySelector('.modal-intro p').textContent = cleanContent(detail.description || 'No description supplied.');
 			document.querySelector('.modal-intro .video').href = video;
-			document.getElementById('modal-bottom').innerHTML = `<div><div class="section-label">Run data</div><div class="detail-grid"><div class="detail"><b>${escapeHtml(detail.points || pointsForTier(detail.tier, detail.rank))}</b><span>Points</span></div>${detail.source === 'AREDL' ? `<div class="detail"><b>${escapeHtml(detail.level_id || level.id || 'Unknown')}</b><span>AREDL ID</span></div>` : ''}<div class="detail"><b>${escapeHtml(detail.tier || 'Uncategorized')}</b><span>NLW tier</span></div><div class="detail"><b>${escapeHtml(detail.length || 'Unknown')}</b><span>Level length</span></div><div class="detail"><b>${escapeHtml(verifier)}</b><span>Verifier</span></div></div><div class="tag-list">${tagNames(detail).map(tag => `<span class="level-tag">${escapeHtml(tag)}</span>`).join('')}</div></div><div><div class="section-label">Completions · ${records.length}</div><div class="victors">${records.length ? records.map(record => `<a class="victor" href="${escapeHtml(record.video_url || record.link || '#')}" target="_blank" rel="noopener">${escapeHtml(record.user || record.submitted_by?.global_name || 'Unknown')} · ${record.percent || 100}%</a>`).join('') : '<span class="victor">No public completions listed</span>'}</div></div>`;
+			document.getElementById('modal-bottom').innerHTML = `<div><div class="section-label">Run data</div><div class="detail-grid"><div class="detail"><b>${escapeHtml(detail.points)}</b><span>Points</span></div>${detail.source === 'AREDL' ? `<div class="detail"><b>${escapeHtml(detail.level_id || level.id || 'Unknown')}</b><span>AREDL ID</span></div>` : ''}<div class="detail"><b>${escapeHtml(detail.tier || 'Uncategorized')}</b><span>NLW tier</span></div><div class="detail"><b>${escapeHtml(detail.length || 'Unknown')}</b><span>Level length</span></div><div class="detail"><b>${escapeHtml(verifier)}</b><span>Verifier</span></div></div><div class="tag-list">${tagNames(detail).map(tag => `<span class="level-tag">${escapeHtml(tag)}</span>`).join('')}</div></div><div><div class="section-label">Completions · ${records.length}</div><div class="victors">${records.length ? records.map(record => `<a class="victor" href="${escapeHtml(record.video_url || record.link || '#')}" target="_blank" rel="noopener">${escapeHtml(record.user || record.submitted_by?.global_name || 'Unknown')} · ${record.percent || 100}%</a>`).join('') : '<span class="victor">No public completions listed</span>'}</div></div>`;
 		}
 		function closeModal() { modalWrap.classList.remove('open'); modal.style.transform = ''; modal.querySelector('.thumb')?.style.removeProperty('transform'); modal.querySelector('.modal-intro')?.style.removeProperty('transform'); document.body.style.overflow = ''; }
 		function updateClock() {
