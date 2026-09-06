@@ -261,16 +261,24 @@
 			{ rank: 1, name: 'Acheron', creator: 'Ryamu', verifier: 'Zoink', victors: ['Zoink', 'Trick', 'wPopoff', 'Taiago'], difficulty: 'Extreme', length: 'Long', fps: '240 FPS', color: 'pink', desc: 'Live list data could not be reached. This fallback record keeps the index usable.', video: 'https://www.youtube.com/watch?v=sBKR6aUorzA', source: 'AREDL' }
 		];
 		const AREDL_API = 'https://api.aredl.net/v2/api/aredl';
+		const AREDL_LEADERBOARD_API = `${AREDL_API}/leaderboard`;
 		const AREDL_REQUEST_DELAY_MS = 750;
 		const UDL_DATA = 'https://udl.pages.dev/data';
 		const newLevels = [
 			{ id: 'sary-never-clear-original', name: 'Sary Never Clear Original', rank: 5, creator: 'Unknown', verifier: 'Unknown', victors: [], difficulty: 'Insane', tier: 'Fuck', length: 'Unknown', fps: 'Unknown', color: 'lime', desc: 'New level added to the index.', source: 'NEW' },
 			{ id: 'lesopowal', name: 'Lesopowal', rank: 9, creator: 'Unknown', verifier: 'Unknown', victors: [], difficulty: 'Insane', tier: 'Fuck', length: 'Unknown', fps: 'Unknown', color: 'cyan', desc: 'New level added to the index.', source: 'NEW' }
 		];
+		const localSubmissions = [
+			// Add a record by filling in: type, level, user, percent, and video_url.
+			// Add a new level by changing type to 'level' and filling in its level fields.
+			{ type: 'record', level: 'Black Blizzard', level_id: '34057654', user: 'T0jt', percent: 100, video_url: 'https://www.youtube.com/watch?v=12udJWGlIeM&t=17s', verifier: 'Krmal' },
+			// { type: 'level', id: 'new-level-id', name: 'New Level', creator: 'Creator', verifier: 'Verifier', tier: 'Extreme', length: 'Long', color: 'pink', desc: 'Description', video: 'https://youtu.be/...' }
+		];
 		const nlwTierOverrides = Object.fromEntries([
 			'Bang Gang', 'Based Gang', 'dance', 'DOUBLE DYNAMO', 'Eon', 'Floating Outskirts', 'Game Over', 'Gentlemens Clique', 'Horros', 'i just wish i could', 'I Wanted To Sleep', 'me when machine gang', 'Piano Man', 'Piano Woman', 'Place', 'plane map', 'Sides Of My Mind', 'Silent Club', 'Specthys', 'Tenkai', 'We Are Not The Same'
 		].map(name => [name.toLowerCase().replace(/[^a-z0-9]/g, ''), 'Fuck']));
 		let levels = [];
+		let officialLeaderboard = [];
 		const grid = document.getElementById('level-grid');
 		const modalWrap = document.getElementById('modal-wrap');
 		const loadMore = document.getElementById('load-more');
@@ -309,12 +317,29 @@
 			const ranked = [...players.values()].sort((first, second) => second.points - first.points || second.levels - first.levels).slice(0, 25);
 			document.getElementById('leaderboard-table').innerHTML = ranked.length ? '<div class="leader-row header"><span>Rank</span><span>Player</span><span>Points</span><span>Levels beaten</span></div>' + ranked.map((player, index) => `<div class="leader-row"><span class="leader-rank">#${String(index + 1).padStart(2, '0')}</span><span class="leader-name">${escapeHtml(player.name)}<small>AEDL completionist</small></span><span class="leader-value">${player.points.toLocaleString()} pts</span><span class="leader-levels">${player.levels} levels</span></div>`).join('') : '<div class="empty">No completion records found yet.</div>';
 		}
+		async function loadOfficialLeaderboard() {
+			try {
+				const pages = await Promise.all(Array.from({ length: 10 }, (_, index) => fetch(`${AREDL_LEADERBOARD_API}?page=${index + 1}&per_page=100`).then(response => { if (!response.ok) throw new Error(`Leaderboard request failed: ${response.status}`); return response.json(); })));
+				officialLeaderboard = pages.flatMap(page => page.data || []).slice(0, 1000);
+				renderLeaderboard();
+			} catch (error) {
+				document.getElementById('leaderboard-table').innerHTML = '<div class="empty">Official player rankings failed to load. Refresh the live index to try again.</div>';
+			}
+		}
 		function initials(name = '?') { return name.replace(/[^a-zA-Z ]/g, '').split(' ').map(word => word[0]).join('').slice(0, 2).toUpperCase() || '?'; }
 		function escapeHtml(value = '') { return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character])); }
 		function colorFor(name = '') { return ['pink', 'orange', 'cyan', 'violet', 'lime'][name.length % 5]; }
 		function thumbnailFor(level) { if (level.source === 'AREDL') return `https://raw.githubusercontent.com/All-Rated-Extreme-Demon-List/Thumbnails/main/levels/cards/${level.id}.webp`; const videoId = level.video?.match(/(?:watch\?v=|youtu\.be\/|shorts\/)([\w-]+)/)?.[1]; return videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : ''; }
 		function normalizeAredl(level) { const nlw = window.nlwData?.[normalizeName(level.name)]; const tier = nlw?.tier || level.nlw_tier || level.tier || level.tier_name || 'Uncategorized'; return { ...level, id: level.level_id, source: 'AREDL', rank: level.position, creator: 'AREDL community', verifier: 'Open details', difficulty: 'Extreme', tier, points: pointsForTier(tier, level.position), length: level.tags?.find(tag => /short|medium|long|xl/i.test(tag)) || 'Unknown', fps: 'Live data', color: colorFor(level.name), desc: cleanContent(nlw?.description || level.description || 'No description supplied.') }; }
-		function normalizeUdl(level, path, rank) { const nlw = window.nlwData?.[normalizeName(level.name)]; const tier = nlw?.tier || level.nlw_tier || nlwTierOverrides[normalizeName(level.name)] || level.tier || level.tier_name || 'Uncategorized'; const levelRank = path.startsWith('_') ? null : rank; return { ...level, id: level.id, source: 'UDL', rank: levelRank, creator: level.author || 'Unknown', verifier: level.verifier || 'Unknown', video: level.verification, victors: (level.records || []).filter(record => record.percent === 100).map(record => record.user), difficulty: 'Extreme', tier, points: pointsForTier(tier, levelRank), length: level.tags?.find(tag => /short|medium|long|xl/i.test(tag)) || 'Unknown', fps: 'Live data', color: colorFor(level.name), desc: cleanContent(nlw?.description || level.description || 'No description supplied.'), path }; }
+		function normalizeUdl(level, path, rank) { const nlw = window.nlwData?.[normalizeName(level.name)]; const tier = nlw?.tier || level.nlw_tier || nlwTierOverrides[normalizeName(level.name)] || level.tier || level.tier_name || 'Uncategorized'; const levelRank = path.startsWith('_') ? null : rank; return { ...level, id: level.id, source: 'UDL', rank: levelRank, creator: level.author || 'Unknown', verifier: level.verifier || 'Unknown', video: level.verification, victors: [], records: [], difficulty: 'Extreme', tier, points: pointsForTier(tier, levelRank), length: level.tags?.find(tag => /short|medium|long|xl/i.test(tag)) || 'Unknown', fps: 'Live data', color: colorFor(level.name), desc: cleanContent(nlw?.description || level.description || 'No description supplied.'), path }; }
+		function applyLocalSubmissions() {
+			localSubmissions.filter(submission => submission.type === 'level' && submission.name && submission.id).forEach(submission => levels.push({ ...submission, source: 'LOCAL', rank: null, difficulty: submission.difficulty || 'Extreme', tier: submission.tier || 'Uncategorized', points: pointsForTier(submission.tier, null), creator: submission.creator || 'Unknown', verifier: submission.verifier || 'Unknown', length: submission.length || 'Unknown', color: submission.color || colorFor(submission.name), desc: submission.desc || 'Locally submitted level.' }));
+			localSubmissions.filter(submission => submission.type === 'record' && submission.level && submission.user).forEach(submission => {
+				const level = levels.find(candidate => normalizeName(candidate.name) === normalizeName(submission.level));
+				if (!level) return;
+				level.records = [...(level.records || []), { user: submission.user, percent: Number(submission.percent) || 100, video_url: submission.video_url || submission.video || '#', verifier: submission.verifier || '' }];
+			});
+		}
 		function wait(milliseconds) { return new Promise(resolve => setTimeout(resolve, milliseconds)); }
 		async function loadAredlRecords(aredl, onLevelLoaded) {
 			const levelsWithRecords = [];
@@ -350,10 +375,12 @@
 				const udlResults = await Promise.allSettled(udlPaths.map(async path => normalizeUdl(await (await fetch(`${UDL_DATA}/${path.startsWith('_') ? path.slice(1) : path}.json`)).json(), path, udlPaths.indexOf(path) + 1)));
 				const udl = udlResults.filter(result => result.status === 'fulfilled').map(result => result.value);
 				levels = [...levels, ...udl];
+				applyLocalSubmissions();
 				populateFilterOptions();
+				renderLeaderboard();
 				document.getElementById('level-count').textContent = levels.length.toLocaleString();
 				render();
-				document.getElementById('victory-count').textContent = 'On demand';
+				document.getElementById('victory-count').textContent = '1 local';
 				sourceNote.textContent = `${aredl.length.toLocaleString()} AEDL levels + ${udl.length.toLocaleString()} UDL levels loaded. Completion records open when you inspect a level.`;
 			} catch (error) { levels = fallbackLevels; sourceNote.classList.add('error'); sourceNote.textContent = 'Live data failed to load. Showing fallback data so the list remains usable.'; }
 			render();
@@ -372,7 +399,7 @@
 			document.getElementById('modal-top').innerHTML = `<div class="thumb ${level.color}" style="background-image:linear-gradient(135deg,rgba(9,11,20,.2),rgba(9,11,20,.35)),url('${thumbnailFor(level)}')"><span class="rank">${level.rank ? '#' + String(level.rank).padStart(3, '0') : 'UDL'}</span><span class="difficulty">${level.source}</span><strong class="thumb-title">${escapeHtml(level.name)}</strong></div><div class="modal-intro"><div class="eyebrow">${level.source} ${level.rank ? '/ placement #' + level.rank : '/ unrated archive'}</div><h2>${escapeHtml(level.name)}</h2><p>${escapeHtml(level.desc)}</p><a class="video" href="${level.video || '#'}" target="_blank" rel="noopener">▶ Watch verified video</a></div>`;
 			document.getElementById('modal-bottom').innerHTML = '<div class="empty">Loading verifier records...</div>';
 			let detail = level;
-			if (level.source === 'AREDL') { try { const [detailResponse, recordsResponse] = await Promise.all([fetch(`${AREDL_API}/levels/${level.id}`), fetch(`${AREDL_API}/levels/${level.id}/records`)]); detail = { ...level, ...(await detailResponse.json()), tier: level.tier, records: (await recordsResponse.json()).data || [] }; } catch (error) { detail = { ...level, description: 'Level details failed to load. Showing the summary available from the live list.' }; } }
+			if (level.source === 'AREDL') { try { const detailResponse = await fetch(`${AREDL_API}/levels/${level.id}`); const localRecords = localSubmissions.filter(submission => submission.type === 'record' && normalizeName(submission.level) === normalizeName(level.name)).map(submission => ({ user: submission.user, percent: submission.percent, video_url: submission.video_url, verifier: submission.verifier })); detail = { ...level, ...(await detailResponse.json()), tier: level.tier, records: localRecords }; } catch (error) { detail = { ...level, description: 'Level details failed to load. Showing the summary available from the live list.' }; } }
 			const verification = detail.verifications?.[0];
 			const verifier = verification?.submitted_by?.global_name || detail.verifier || 'Unknown';
 			const video = verification?.video_url || detail.video || '#';
