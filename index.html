@@ -4,7 +4,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="theme-color" content="#090b14">
-	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23090b14'/%3E%3Cpath d='M32 7 54 19v26L32 57 10 45V19L32 7Z' fill='%23d9ff4f'/%3E%3Cpath d='m36 15-14 19h9l-3 15 14-21h-9l3-13Z' fill='%23090b14'/%3E%3C/svg%3E">
+	<link rel="icon" href="favicon.svg" type="image/svg+xml">
 	<title>AEDL | All Extreme Demons List</title>
 	<style>
 		@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
@@ -204,6 +204,9 @@
 		.about-link:hover { color: var(--cyan); transform: translateX(4px); }
 		.refresh-data { margin-top: 10px; padding: 8px 10px; border: 1px solid rgba(85,232,255,.35); color: var(--cyan); background: rgba(85,232,255,.06); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; transition: background .2s, transform .2s; }
 		.refresh-data:hover { background: rgba(85,232,255,.16); transform: translateY(-2px); }
+		.social-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+		.social-link { display: inline-flex; align-items: center; gap: 7px; padding: 9px 11px; border: 1px solid var(--line); color: var(--ink); background: rgba(85,232,255,.06); font-size: 10px; font-weight: 700; text-decoration: none; text-transform: uppercase; transition: color .2s, border-color .2s, background .2s, transform .2s; }
+		.social-link:hover { color: #07111f; border-color: var(--cyan); background: var(--cyan); transform: translateY(-3px); }
 		@media (max-width: 560px) { .leader-row { grid-template-columns: 38px minmax(0, 1fr) 80px; gap: 10px; padding: 0 12px; } .leader-row > :last-child { display: none; } }
 		@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 		@keyframes orbit-pulse { 0%, 100% { opacity: .55; transform: scale(.96) rotate(0deg); } 50% { opacity: 1; transform: scale(1.04) rotate(8deg); } }
@@ -237,7 +240,7 @@
 		<section id="about" class="about-panel" aria-labelledby="about-title">
 			<div class="about-block"><h2 id="about-title">Mission control</h2><p>AEDL is a live browser index for rated extremes, unrated archives, and the players who prove them. Level records are fetched on demand to keep the experience fast.</p><button class="refresh-data" id="refresh-data" type="button">Refresh live index</button></div>
 			<div class="about-block"><span class="about-label">Data channels</span><a class="about-link" href="https://aredl.net/" target="_blank" rel="noopener">AREDL official list ↗</a><a class="about-link" href="https://udl.pages.dev/" target="_blank" rel="noopener">UDL archive ↗</a></div>
-			<div class="about-block"><span class="about-label">Community relay</span><p>Have a level, record, completion, or verification to add?</p><a class="about-link" href="https://forms.gle/8qx5i1ibJNNnKu8m9" target="_blank" rel="noopener">Open submission form ↗</a></div>
+			<div class="about-block"><span class="about-label">Community relay</span><p>Have a level, record, completion, or verification to add?</p><a class="about-link" href="https://forms.gle/8qx5i1ibJNNnKu8m9" target="_blank" rel="noopener">Open submission form ↗</a><div class="social-links"><a class="social-link" id="discord-link" href="#" target="_blank" rel="noopener">Discord ↗</a><a class="social-link" id="tiktok-link" href="#" target="_blank" rel="noopener">TikTok ↗</a><a class="social-link" id="youtube-link" href="#" target="_blank" rel="noopener">YouTube ↗</a></div></div>
 		</section>
 	</main>
 
@@ -264,6 +267,12 @@
 		const AREDL_LEADERBOARD_API = `${AREDL_API}/leaderboard`;
 		const AREDL_REQUEST_DELAY_MS = 750;
 		const UDL_DATA = 'https://udl.pages.dev/data';
+		// Replace these three URLs with your real community and channel links.
+		const SOCIAL_LINKS = {
+			discord: 'https://discord.gg/RRfY3CSpe',
+			tiktok: 'https://www.tiktok.com/@aedl.list?_r=1&_t=ZN-99VxUISbNQM',
+			youtube: 'https://www.youtube.com/@aedl2334-l1l'
+		};
 		const newLevels = [
 			{ id: 'sary-never-clear-original', name: 'Sary Never Clear Original', rank: 5, creator: 'Unknown', verifier: 'Unknown', victors: [], difficulty: 'Insane', tier: 'Fuck', length: 'Unknown', fps: 'Unknown', color: 'lime', desc: 'New level added to the index.', source: 'NEW' },
 			{ id: 'lesopowal', name: 'Lesopowal', rank: 9, creator: 'Unknown', verifier: 'Unknown', victors: [], difficulty: 'Insane', tier: 'Fuck', length: 'Unknown', fps: 'Unknown', color: 'cyan', desc: 'New level added to the index.', source: 'NEW' }
@@ -296,7 +305,10 @@
 		const submitPanel = document.querySelector('.submit-panel');
 
 		function normalizeName(name = '') { return String(name).toLowerCase().replace(/[^a-z0-9]/g, ''); }
-		function pointsForTier(tier = '', rank) { const tiers = ['Fuck', 'Beginner', 'Easy', 'Medium', 'Hard', 'Very Hard', 'Insane', 'Extreme', 'Remorseless', 'Relentless', 'Terrifying', 'Catastrophic', 'Inexorable', 'Excruciating', 'Merciless']; const tierPoints = 150 + Math.max(0, tiers.indexOf(tier)) * 10; const numericRank = Number(rank); return tierPoints + (numericRank > 0 && numericRank <= 50 ? 25 : 0) + (numericRank > 0 && numericRank <= 10 ? 50 : 0); }
+		function pointsForTier(tier = '', rank) { const tiers = ['Fuck', 'Beginner', 'Easy', 'Medium', 'Hard', 'Very Hard', 'Insane', 'Extreme', 'Remorseless', 'Relentless', 'Terrifying', 'Catastrophic', 'Inexorable', 'Excruciating', 'Merciless']; const tierIndex = tiers.findIndex(name => name.toLowerCase() === String(tier).toLowerCase()); const tierPoints = 100 + Math.max(0, tierIndex) * 50; const numericRank = Number(rank); return tierPoints + (numericRank > 0 && numericRank <= 50 ? 25 : 0) + (numericRank > 0 && numericRank <= 10 ? 50 : 0); }
+		document.getElementById('discord-link').href = SOCIAL_LINKS.discord;
+		document.getElementById('tiktok-link').href = SOCIAL_LINKS.tiktok;
+		document.getElementById('youtube-link').href = SOCIAL_LINKS.youtube;
 		function cleanContent(value = '') { return String(value).replace(/\bepilepsy\b/gi, '').replace(/\bdo not\b/gi, '').replace(/\bdon['’]?t\b/gi, '').replace(/\bdont\b/gi, '').replace(/\s{2,}/g, ' ').replace(/\s+([.,!?])/g, '$1').trim(); }
 		function tagNames(level) { return (level.tags || []).map(tag => cleanContent(typeof tag === 'string' ? tag : tag.name || tag.label || '')).filter(tag => tag && !/\bbeat\b/i.test(tag)); }
 		function populateFilterOptions() {
